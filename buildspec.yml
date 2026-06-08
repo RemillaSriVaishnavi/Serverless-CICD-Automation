@@ -1,0 +1,39 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_ACCOUNT_ID: "432998432349"
+    REPOSITORY_NAME: "website"
+    CONTAINER_NAME: "website"
+    AWS_DEFAULT_REGION: "us-east-1"
+
+phases:
+  pre_build:
+    commands:
+      - "echo Logging in to Amazon ECR..."
+      - "IMAGE_TAG=$CODEBUILD_BUILD_NUMBER"
+      - "REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME"
+      - "ECR_REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+      - "echo IMAGE TAG = $IMAGE_TAG"
+      - "echo REPOSITORY_URI = $REPOSITORY_URI"
+      - "aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY"
+
+  build:
+    commands:
+      - "echo Build started on `date`"
+      - "docker build --no-cache -t $REPOSITORY_NAME:$IMAGE_TAG ."
+      - "docker tag $REPOSITORY_NAME:$IMAGE_TAG $REPOSITORY_URI:$IMAGE_TAG"
+      - "docker tag $REPOSITORY_NAME:$IMAGE_TAG $REPOSITORY_URI:latest"
+
+  post_build:
+    commands:
+      - "echo Build completed on `date`"
+      - "echo Pushing Docker images..."
+      - "docker push $REPOSITORY_URI:$IMAGE_TAG"
+      - "docker push $REPOSITORY_URI:latest"
+      - "printf '[{\"name\":\"%s\",\"imageUri\":\"%s\"}]' $CONTAINER_NAME $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json"
+      - "cat imagedefinitions.json"
+
+artifacts:
+  files:
+    - "imagedefinitions.json"
